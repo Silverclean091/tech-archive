@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+Icon?
+
+# IDE
+.vscode/
+.idea/
+
+# Obsidian
+.obsidian/
+
+# Environment
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node.js
+node_modules/
+
+# Logs
+*.log

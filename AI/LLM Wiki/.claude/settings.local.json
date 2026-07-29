@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/wiki_lint.sh)",
+      "Bash(bash /tmp/wiki_lint.sh)"
+    ]
+  }
+}
