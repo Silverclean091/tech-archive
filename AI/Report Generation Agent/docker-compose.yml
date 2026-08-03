@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: report-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: H4M_host
+      POSTGRES_PASSWORD: H4M_gorochan5656
+      POSTGRES_DB: report_agent
+    ports:
+      - "5433:5432"  # flownix 프로젝트와 포트번호가 충돌하여 5433으로 변경
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      
+volumes:
+  pgdata:
