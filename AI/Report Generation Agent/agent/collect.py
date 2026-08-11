@@ -1,3 +1,12 @@
+"""네이버 뉴스와 Tavily 검색 API를 사용하여 자료를 수집하고, 이를 DB에 저장합니다.
+
+search_naver_news: 네이버 뉴스 검색 API를 사용하여 뉴스 기사를 검색합니다.
+search_tavily: Tavily 검색 API를 사용하여 자료를 검색합니다.
+clean_html: HTML의 태그 문법을 제거하고 텍스트값만 남깁니다.
+
+collect_documents: 주어진 키워드로 네이버 뉴스와 Tavily에서 자료를 수집하고, DB에 저장합니다.
+"""
+
 import os
 import django
 
@@ -36,22 +45,13 @@ def clean_html(text: str):
     return re.sub(r"<.*?>", "", text or "")
 
 
-if __name__ == "__main__":
-    # naver_results = search_naver_news("AX전환")
-    # for item in naver_results:
-    #     print("[네이버]", item["title"])
-
-    # tavily_results = search_tavily("AX전환")
-    # for item in tavily_results:
-    #     print("[Tavily]", item["title"])
-
-    keyword = "AX전환"
-
+def collect_documents(keyword: str):
+    """주어진 키워드로 네이버 뉴스와 Tavily에서 자료를 수집하고, DB에 저장합니다."""
     report = Report.objects.create(keyword=keyword)
     search_query = SearchQuery.objects.create(report=report, keyword=keyword)
 
-    naver_results = search_naver_news(keyword)
-    for item in naver_results:
+    naver_result = search_naver_news(keyword)
+    for item in naver_result:
         Document.objects.create(
             search_query=search_query,
             source="naver",
@@ -60,8 +60,8 @@ if __name__ == "__main__":
             content=clean_html(item.get("description", "")),
         )
 
-    tavily_results = search_tavily(keyword)
-    for item in tavily_results:
+    tavily_result = search_tavily(keyword)
+    for item in tavily_result:
         Document.objects.create(
             search_query=search_query,
             source="tavily",
@@ -70,4 +70,34 @@ if __name__ == "__main__":
             content=item.get("content", ""),
         )
 
-    print(f"Report id: {report.id}, 저장된 Document 수: {search_query.documents.count()}")
+    return search_query
+
+
+# if __name__ == "__main__":
+
+#     keyword = "AX전환"
+
+#     report = Report.objects.create(keyword=keyword)
+#     search_query = SearchQuery.objects.create(report=report, keyword=keyword)
+
+#     naver_results = search_naver_news(keyword)
+#     for item in naver_results:
+#         Document.objects.create(
+#             search_query=search_query,
+#             source="naver",
+#             title=clean_html(item["title"]),
+#             url=item["link"],
+#             content=clean_html(item.get("description", "")),
+#         )
+
+#     tavily_results = search_tavily(keyword)
+#     for item in tavily_results:
+#         Document.objects.create(
+#             search_query=search_query,
+#             source="tavily",
+#             title=item.get("title", ""),
+#             url=item["url"],
+#             content=item.get("content", ""),
+#         )
+
+#     print(f"Report id: {report.id}, 저장된 Document 수: {search_query.documents.count()}")
