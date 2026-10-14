@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Focus &amp; Grass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>🍅 Focus &amp; Grass</h1>
+  </header>
+
+  <p id="storage-banner" class="banner" role="alert" hidden>
+    저장되지 않습니다. 브라우저 저장소를 사용할 수 없어 이 탭을 닫으면 기록이 사라집니다.
+  </p>
+
+  <section class="card" aria-labelledby="heatmap-title">
+    <h2 id="heatmap-title" class="sr-only">달성 히트맵</h2>
+    <div id="heatmap" class="heatmap"></div>
+    <div class="legend" aria-hidden="true">
+      <span>기록 없음</span><span class="cell" data-level="-1"></span>
+      <span class="legend-gap">적음</span>
+      <span class="cell" data-level="0"></span>
+      <span class="cell" data-level="1"></span>
+      <span class="cell" data-level="2"></span>
+      <span class="cell" data-level="3"></span>
+      <span class="cell" data-level="4"></span>
+      <span>많음</span>
+    </div>
+  </section>
+
+  <main class="columns">
+    <section id="todo-panel" class="card" aria-labelledby="todo-date">
+      <div class="todo-head">
+        <h2 id="todo-date"></h2>
+        <button id="go-today" type="button" hidden>오늘로</button>
+      </div>
+      <ul id="todo-list" class="todo-list"></ul>
+      <form id="todo-form" class="todo-form">
+        <input id="todo-input" type="text" maxlength="200" placeholder="할 일 추가" autocomplete="off" aria-label="할 일 추가">
+        <button type="submit">추가</button>
+      </form>
+      <p id="todo-progress" class="muted"></p>
+    </section>
+
+    <section id="timer-panel" class="card" aria-labelledby="timer-mode" data-phase="idle">
+      <h2 id="timer-mode">대기</h2>
+      <div id="timer-display" class="timer-display" aria-live="off">25:00</div>
+      <div class="timer-buttons">
+        <button id="btn-start" type="button">시작</button>
+        <button id="btn-pause" type="button" hidden>일시정지</button>
+        <button id="btn-resume" type="button" hidden>재개</button>
+        <button id="btn-reset" type="button">리셋</button>
+      </div>
+      <p id="timer-summary" class="muted"></p>
+      <p id="pomodoro-count" class="muted"></p>
+
+      <details class="settings">
+        <summary>⚙ 시간 설정</summary>
+        <form id="settings-form" novalidate>
+          <label>집중 (분)
+            <input id="set-focus" type="text" inputmode="numeric" autocomplete="off">
+          </label>
+          <small id="err-focus" class="error" role="alert"></small>
+          <label>휴식 (분)
+            <input id="set-break" type="text" inputmode="numeric" autocomplete="off">
+          </label>
+          <small id="err-break" class="error" role="alert"></small>
+          <label class="check"><input id="set-auto" type="checkbox"> 집중 후 휴식 자동 시작</label>
+          <label class="check"><input id="set-sound" type="checkbox"> 소리</label>
+          <label class="check"><input id="set-notify" type="checkbox"> 브라우저 알림</label>
+          <button type="submit">저장</button>
+        </form>
+      </details>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
