@@ -1,0 +1,117 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Focus &amp; Grass timer smoke test</title>
+<!--
+  실제 시간으로 약 4분이 걸리는 타이머 확인용 페이지 (node --test 대상이 아님).
+  1) focus-grass/ 에서 python3 -m http.server 8765
+  2) http://localhost:8765/tests/browser/timer-smoke.html 을 열고 SUMMARY 줄이 나올 때까지 기다린다.
+  앱이 쓰는 localStorage(ffg:* 키)를 비우고 테스트합니다. 시작할 때 백업했다가 끝나면 복원하지만,
+  도중에 탭을 닫으면 복원되지 않습니다. 위험은 "서버 주소(호스트+포트)" 기준이므로 실제 기록이 있는
+  주소(예: 앱을 8000 포트로 쓰고 있다면 8000)가 아닌 다른 포트(예: 8765)로 서버를 띄워서 여세요.
+-->
+<pre id="out"></pre>
+<iframe id="app" style="width:1000px;height:900px"></iframe>
+<script>
+const out = document.getElementById('out');
+const frame = document.getElementById('app');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+let pass = 0;
+let fail = 0;
+
+const ffgKeys = () => Object.keys(localStorage).filter((k) => k.startsWith('ffg:'));
+const backup = Object.fromEntries(ffgKeys().map((k) => [k, localStorage.getItem(k)]));
+function restoreStorage() {
+  ffgKeys().forEach((k) => localStorage.removeItem(k));
+  Object.entries(backup).forEach(([k, v]) => localStorage.setItem(k, v));
+  out.textContent += `RESTORED ${Object.keys(backup).length} ffg key(s)\n`;
+}
+
+function check(name, ok, extra = '') {
+  if (ok) pass += 1; else fail += 1;
+  out.textContent += `${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : ` ${extra}`}\n`;
+}
+
+function load() {
+  return new Promise((resolve) => {
+    frame.onload = () => resolve(frame.contentDocument);
+    frame.src = `/?${Math.random()}`;
+  });
+}
+
+function reload() {
+  return new Promise((resolve) => {
+    frame.onload = () => resolve(frame.contentDocument);
+    frame.contentWindow.location.reload();
+  });
+}
+
+(async () => {
+  try {
+    let d = await load();
+    frame.contentWindow.localStorage.clear();
+    d = await reload();
+    const $ = (s) => d.querySelector(s);
+    const saveSettings = (focus, brk, auto) => {
+      $('#set-focus').value = focus;
+      $('#set-break').value = brk;
+      $('#set-auto').checked = auto;
+      $('#settings-form').requestSubmit();
+    };
+
+    // autoSwitch 꺼짐: 집중 종료 -> 휴식 대기, 🍅 1
+    saveSettings('1', '1', false);
+    $('#btn-start').click();
+    await wait(1500);
+    check('T1 running shows focus and a ticking tab title', $('#timer-mode').textContent === '집중' && d.title.startsWith('🍅'));
+    $('#btn-start').hidden || check('T1 start button hidden while running', false);
+    await wait(60500);
+    check('T2 focus end -> waiting for break, count 1',
+      $('#timer-mode').textContent === '휴식 대기' && $('#pomodoro-count').textContent.endsWith('1') && $('#btn-start').textContent === '휴식 시작',
+      `${$('#timer-mode').textContent} / ${$('#pomodoro-count').textContent}`);
+    check('T2 tab title announces the finished focus session', d.title === '✅ 집중 끝! · Focus & Grass', d.title);
+
+    // 휴식 시작 -> 끝나면 대기, 카운트 그대로
+    $('#btn-start').click();
+    await wait(1500);
+    check('T3 break running (title shows the break countdown, notice cleared)',
+      $('#timer-mode').textContent === '휴식' && d.title.startsWith('☕'), d.title);
+    await wait(60500);
+    check('T4 break end -> idle, count still 1',
+      $('#timer-mode').textContent === '대기' && $('#pomodoro-count').textContent.endsWith('1'),
+      `${$('#timer-mode').textContent} / ${$('#pomodoro-count').textContent}`);
+    check('T4 tab title announces the finished break', d.title === '✅ 휴식 끝! · Focus & Grass', d.title);
+
+    // autoSwitch 켜짐: 집중 종료 -> 바로 휴식, 🍅 2
+    saveSettings('1', '1', true);
+    $('#btn-start').click();
+    await wait(61500);
+    check('T5 autoSwitch: focus end -> break starts at once, count 2',
+      $('#timer-mode').textContent === '휴식' && $('#pomodoro-count').textContent.endsWith('2'),
+      `${$('#timer-mode').textContent} / ${$('#pomodoro-count').textContent}`);
+    // 자동 전환으로 시작된 휴식도 종료 시각에 끝나는지 (단발 타이머 재설정)
+    await wait(60500);
+    check('T6 auto-started break also ends', $('#timer-mode').textContent === '대기', $('#timer-mode').textContent);
+
+    // 일시정지 / 재개 / 리셋
+    $('#btn-start').click();
+    await wait(1200);
+    $('#btn-pause').click();
+    const frozen = $('#timer-display').textContent;
+    await wait(1200);
+    check('T7 pause freezes the display', $('#timer-display').textContent === frozen && $('#timer-mode').textContent === '집중 (일시정지)');
+    $('#btn-resume').click();
+    await wait(600);
+    $('#btn-reset').click();
+    check('T8 reset returns to idle and does not add a pomodoro',
+      $('#timer-mode').textContent === '대기' && $('#pomodoro-count').textContent.endsWith('2'),
+      `${$('#timer-mode').textContent} / ${$('#pomodoro-count').textContent}`);
+    check('T8 reset clears the finish notice from the tab title', d.title === 'Focus & Grass', d.title);
+
+    restoreStorage();
+    out.textContent += `SUMMARY ${pass} pass, ${fail} fail\nDONE\n`;
+  } catch (error) {
+    restoreStorage();
+    out.textContent += `ERROR ${error.message}\nSUMMARY ${pass} pass, ${fail + 1} fail\nDONE\n`;
+  }
+})();
+</script>

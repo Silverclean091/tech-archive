@@ -1,0 +1,221 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Focus &amp; Grass browser smoke test</title>
+<!--
+  브라우저 DOM 동작 확인용 페이지 (node --test 대상이 아님).
+  1) focus-grass/ 에서 python3 -m http.server 8765
+  2) http://localhost:8765/tests/browser/ui-smoke.html 을 열면 PASS/FAIL 목록이 보인다.
+  이 페이지는 앱이 쓰는 localStorage(ffg:* 키)를 비우고 테스트합니다. 시작할 때 그 키들을 백업했다가
+  끝나면 복원하지만, 도중에 탭을 닫으면 복원되지 않습니다. 위험은 "서버 주소(호스트+포트)" 기준이라
+  실제 기록이 있는 주소(예: 앱을 8000 포트로 쓰고 있다면 8000)로는 이 페이지를 열지 말고,
+  다른 포트(예: 8765)로 서버를 띄워서 여세요.
+-->
+<pre id="out"></pre>
+<iframe id="app" style="width:1000px;height:900px"></iframe>
+<script>
+const out = document.getElementById('out');
+const frame = document.getElementById('app');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+let pass = 0;
+let fail = 0;
+
+const ffgKeys = () => Object.keys(localStorage).filter((k) => k.startsWith('ffg:'));
+const backup = Object.fromEntries(ffgKeys().map((k) => [k, localStorage.getItem(k)]));
+function restoreStorage() {
+  ffgKeys().forEach((k) => localStorage.removeItem(k));
+  Object.entries(backup).forEach(([k, v]) => localStorage.setItem(k, v));
+  out.textContent += `RESTORED ${Object.keys(backup).length} ffg key(s)\n`;
+}
+
+function check(name, ok, extra = '') {
+  if (ok) pass += 1; else fail += 1;
+  out.textContent += `${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : ` ${extra}`}\n`;
+}
+
+function load() {
+  return new Promise((resolve) => {
+    frame.onload = () => resolve(frame.contentDocument);
+    frame.src = `/?${Math.random()}`;
+  });
+}
+
+function reload() {
+  return new Promise((resolve) => {
+    frame.onload = () => resolve(frame.contentDocument);
+    frame.contentWindow.location.reload();
+  });
+}
+
+const todayKey = (() => {
+  const t = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`;
+})();
+
+(async () => {
+  try {
+    let d = await load();
+    frame.contentWindow.localStorage.clear();
+    d = await reload();
+    const w = frame.contentWindow;
+    const $ = (s) => d.querySelector(s);
+    const $$ = (s) => [...d.querySelectorAll(s)];
+    const add = (text) => { $('#todo-input').value = text; $('#todo-form').requestSubmit(); };
+    const stored = () => JSON.parse(w.localStorage.getItem('ffg:todos')).days;
+    const rows = () => $$('#todo-list li');
+    const startEdit = (li) => li.querySelector('.todo-text')
+      .dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true }));
+
+    add('alpha');
+    add('beta');
+    check('S0 two items rendered', rows().length === 2, `got ${rows().length}`);
+
+    // 1) 편집 중 전체 렌더(설정 저장도 render() 를 호출한다)가 편집 상태를 깨면 안 된다
+    startEdit(rows()[0]);
+    $('.todo-edit').value = 'half typed';
+    $('#settings-form').requestSubmit();
+    check('F1 edit box survives a full re-render', !!$('.todo-edit') && $('.todo-edit').value === 'half typed');
+    check('F1 uncommitted text is not saved', stored()[todayKey][0].text === 'alpha', `stored=${stored()[todayKey][0].text}`);
+
+    // 1b) 한글 등 조합 입력 중의 Enter 는 글자 확정용이라 편집을 확정하면 안 된다
+    $('.todo-edit').dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
+    check('F1b Enter during IME composition does not commit the edit',
+      !!$('.todo-edit') && stored()[todayKey][0].text === 'alpha');
+    $('.todo-edit').dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true }));
+    check('F1b keyCode 229 (older IME events) is ignored too', !!$('.todo-edit'));
+
+    // 2) 편집 확정(blur)으로 생기는 재렌더가 다른 컨트롤 노드를 바꿔치우면 클릭이 사라진다
+    const betaLi = rows()[1];
+    const betaCheckbox = betaLi.querySelector('input[type=checkbox]');
+    const betaDelete = betaLi.querySelector('.todo-del');
+    const selectedCell = $('#heatmap .cell.selected');
+    $('.todo-edit').value = 'alpha2';
+    $('.todo-edit').dispatchEvent(new w.FocusEvent('blur'));
+    check('F2 edit is committed on blur', stored()[todayKey][0].text === 'alpha2', `stored=${stored()[todayKey][0].text}`);
+    check('F2 other todo row nodes survive the commit re-render',
+      betaLi.isConnected && betaCheckbox.isConnected && betaDelete.isConnected);
+    check('F2 heatmap cell node survives the commit re-render', selectedCell.isConnected);
+    check('F2 row shows the new text', rows()[0].querySelector('.todo-text').textContent === 'alpha2');
+
+    // 3) 같은 노드가 값만 갱신되는지
+    betaCheckbox.click();
+    check('F3 toggling updates the same row in place',
+      betaLi.isConnected && betaCheckbox.checked && betaLi.className === 'done');
+    check('F3 heatmap level follows the completion rate (1/2 -> level 2)',
+      $('#heatmap .cell.selected').dataset.level === '2', `level=${$('#heatmap .cell.selected').dataset.level}`);
+    check('F3 progress text', $('#todo-progress').textContent === '진행률 1/2 (50%)', $('#todo-progress').textContent);
+
+    // 4) 삭제는 해당 행만 제거하고 나머지 노드를 유지
+    const alphaLi = rows()[0];
+    betaDelete.click();
+    check('F4 deleting removes only that row', rows().length === 1 && rows()[0] === alphaLi && !betaLi.isConnected);
+
+    // 5) 실제 사용 경로: 마우스를 누르면 blur 가 먼저 일어나 편집이 원래 날짜에 확정된 뒤 날짜가 바뀐다
+    startEdit(rows()[0]);
+    $('.todo-edit').value = 'zzz';
+    $('.todo-edit').dispatchEvent(new w.FocusEvent('blur'));
+    const cells = $$('#heatmap .cell:not(.future)');
+    cells[cells.length - 3].click();
+    check('F5 switching day leaves no edit box', !$('.todo-edit'));
+    check('F5 edit was committed to the original day, other day is empty',
+      rows().length === 0 && stored()[todayKey][0].text === 'zzz', `rows=${rows().length}`);
+    $('#go-today').click();
+    check('F5 coming back shows today list', rows().length === 1 && rows()[0].querySelector('.todo-text').textContent === 'zzz');
+
+    // 5b) blur 없이(자정 이동·프로그램에 의한 렌더) 날짜가 바뀌면 편집은 버려지고 다른 날짜에 쓰이지 않는다
+    startEdit(rows()[0]);
+    $('.todo-edit').value = 'never saved';
+    cells[cells.length - 3].click();
+    check('F5b day switch without blur discards the edit and writes nothing',
+      !$('.todo-edit') && rows().length === 0 && stored()[todayKey][0].text === 'zzz');
+    $('#go-today').click();
+
+    // 6) 같은 날짜 화면에서 항목 추가 시 기존 행/셀 노드 유지, 순서 유지
+    const keepLi = rows()[0];
+    const keepCell = $('#heatmap .cell.selected');
+    add('gamma');
+    check('F6 adding keeps existing nodes and appends in order',
+      keepLi.isConnected && keepCell.isConnected && rows()[0] === keepLi && rows().length === 2);
+
+    // 7) 두 번째 탭의 변경이 첫 번째 탭의 다음 저장에 덮어써지면 안 된다
+    const frameB = document.createElement('iframe');
+    frameB.style.cssText = 'width:600px;height:400px';
+    document.body.append(frameB);
+    await new Promise((resolve) => { frameB.onload = resolve; frameB.src = `/?b${Math.random()}`; });
+    const dB = frameB.contentDocument;
+    dB.querySelector('#todo-input').value = 'from B';
+    dB.querySelector('#todo-form').requestSubmit();
+    await wait(300); // storage 이벤트가 탭 A 에 전달될 시간
+    check('M1 tab A shows the item that tab B added', rows().some((li) => li.textContent.includes('from B')),
+      rows().map((li) => li.textContent).join('|'));
+    add('from A');
+    const allTexts = Object.values(stored()).flat().map((t) => t.text);
+    check('M1 both tabs\' items are stored (no silent overwrite)',
+      allTexts.includes('from A') && allTexts.includes('from B'), allTexts.join('|'));
+    frameB.remove();
+
+    // 8) 시작 버튼을 더블클릭하면 같은 자리에 나타난 일시정지 버튼이 두 번째 클릭을 받는다
+    const click = (el, detail) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, detail }));
+    click($('#btn-start'), 1);
+    check('D1 start runs the timer', $('#timer-mode').textContent === '집중');
+    click($('#btn-pause'), 2); // 더블클릭의 두 번째 클릭
+    check('D1 the second click of a double-click does not pause', $('#timer-mode').textContent === '집중',
+      $('#timer-mode').textContent);
+    click($('#btn-pause'), 1);
+    check('D1 a normal click still pauses', $('#timer-mode').textContent === '집중 (일시정지)');
+    click($('#btn-resume'), 2);
+    check('D1 a double-click tail does not resume either', $('#timer-mode').textContent === '집중 (일시정지)');
+    click($('#btn-resume'), 1);
+    check('D1 a normal click resumes', $('#timer-mode').textContent === '집중');
+    click($('#btn-reset'), 1);
+
+    // 9) 시간 입력: 저장되면 입력칸이 실제 저장값으로 보정되고, 숫자 이외의 형식은 거부된다
+    const saveSettings = (focus, brk) => {
+      $('#set-focus').value = focus;
+      $('#set-break').value = brk;
+      $('#settings-form').requestSubmit();
+    };
+    saveSettings(' 7 ', '5');
+    check('S1 a valid padded value is saved and the box shows the stored value',
+      $('#set-focus').value === '7' && $('#timer-summary').textContent === '집중 7분 / 휴식 5분',
+      `${$('#set-focus').value} / ${$('#timer-summary').textContent}`);
+    saveSettings('1e1', '0x10');
+    check('S1 exponent and hex forms are rejected with errors and nothing changes',
+      $('#err-focus').textContent !== '' && $('#err-break').textContent !== '' &&
+      $('#timer-summary').textContent === '집중 7분 / 휴식 5분');
+    saveSettings('25', '5');
+
+    // 10) 대기 중에는 화면(DOM)을 다시 쓰지 않는다
+    await wait(400);
+    const mutations = [];
+    const observer = new w.MutationObserver((records) => mutations.push(...records));
+    observer.observe(d.documentElement, { subtree: true, childList: true, characterData: true, attributes: true });
+    await wait(1000);
+    observer.disconnect();
+    check('P1 an idle timer causes no DOM writes', mutations.length === 0,
+      `${mutations.length} mutation(s), first on <${mutations[0]?.target.nodeName}>`);
+
+    // 11) 자정을 넘기면(앱을 켜 둔 채) 오늘을 보던 화면이 1~2초 안에 새 날짜로 넘어간다
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+    const offsetMs = nextDay.getTime() - Date.now();
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const nextKey = `${nextDay.getFullYear()}-${pad2(nextDay.getMonth() + 1)}-${pad2(nextDay.getDate())}`;
+    const RealDate = w.Date;
+    w.Date = class extends RealDate {
+      constructor(...args) { if (args.length === 0) super(RealDate.now() + offsetMs); else super(...args); }
+      static now() { return RealDate.now() + offsetMs; }
+    };
+    await wait(2200);
+    check('R1 viewing today follows the new day after midnight',
+      $('#todo-date').textContent === `📅 ${nextKey} (오늘)`, $('#todo-date').textContent);
+    w.Date = RealDate;
+
+    restoreStorage();
+    out.textContent += `SUMMARY ${pass} pass, ${fail} fail\nDONE\n`;
+  } catch (error) {
+    restoreStorage();
+    out.textContent += `ERROR ${error.message}\nSUMMARY ${pass} pass, ${fail + 1} fail\nDONE\n`;
+  }
+})();
+</script>
