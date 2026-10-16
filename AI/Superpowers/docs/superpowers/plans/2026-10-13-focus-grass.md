@@ -50,9 +50,9 @@
 ## 파일 구조
 
 ```
+AI/Superpowers/README.md   # 앱 전체 설명 (focus-grass 폴더 바깥)
 AI/Superpowers/focus-grass/
   package.json
-  README.md
   index.html
   css/style.css
   serve.js           # 로컬 정적 서버 (macOS / Windows / Linux 공통)
@@ -3127,7 +3127,7 @@ Run (in `AI/Superpowers/focus-grass`): `chmod +x run.sh && bash -n run.sh && ./r
 ### Task 11: README와 최종 점검
 
 **Files:**
-- Create: `focus-grass/README.md`
+- Create: `README.md` (`AI/Superpowers/` 바로 아래)
 
 **Interfaces:**
 - Consumes: 앞선 모든 태스크의 산출물
@@ -3135,7 +3135,7 @@ Run (in `AI/Superpowers/focus-grass`): `chmod +x run.sh && bash -n run.sh && ./r
 
 - [ ] **Step 1: `README.md` 작성**
 
-`focus-grass/README.md`:
+`README.md` (`AI/Superpowers/` 바로 아래):
 
 ````markdown
 # Focus & Grass 🍅🌱

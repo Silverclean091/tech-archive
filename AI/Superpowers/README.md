@@ -156,6 +156,7 @@ node --test
 ## 프로젝트 구조
 
 ```
+README.md                 # 이 문서 (focus-grass 폴더 바깥)
 focus-grass/
 ├── index.html            # 화면 골격
 ├── css/style.css
@@ -206,5 +207,5 @@ focus-grass/
 
 ## 설계 문서
 
-- 설계 스펙: [`../docs/superpowers/specs/2026-10-13-focus-grass-design.md`](../docs/superpowers/specs/2026-10-13-focus-grass-design.md)
-- 구현 계획: [`../docs/superpowers/plans/2026-10-13-focus-grass.md`](../docs/superpowers/plans/2026-10-13-focus-grass.md)
+- 설계 스펙: [`docs/superpowers/specs/2026-10-13-focus-grass-design.md`](docs/superpowers/specs/2026-10-13-focus-grass-design.md)
+- 구현 계획: [`docs/superpowers/plans/2026-10-13-focus-grass.md`](docs/superpowers/plans/2026-10-13-focus-grass.md)
