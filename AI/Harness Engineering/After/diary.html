@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>다이어리</title>
+<style>
+:root {
+  --color-bg: #ffffff;
+  --color-bg-sidebar: #f7f7f5;
+  --color-text: #37352f;
+  --color-text-secondary: #787774;
+  --color-border: #e9e9e7;
+  --color-hover: #f1f1ef;
+  --color-accent: #2383e2;
+  --color-accent-text: #ffffff;
+
+  --color-tag-gray: #e3e2e0;
+  --color-tag-yellow: #fdecc8;
+  --color-tag-green: #dbeddb;
+  --color-tag-blue: #d3e5ef;
+  --color-tag-red: #ffe2dd;
+  --color-tag-purple: #e8deee;
+
+  --font-base: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-lg: 20px;
+  --font-size-xl: 28px;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --shadow-popover: 0 4px 12px rgba(15, 15, 15, 0.1);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-base);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+button, input, textarea { font-family: var(--font-base); font-size: inherit; color: inherit; }
+
+button {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+button:hover { background: var(--color-hover); }
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.app { display: flex; height: 100%; }
+
+/* 사이드바 */
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-sidebar);
+  border-right: 1px solid var(--color-border);
+  box-shadow: none;
+  overflow: hidden;
+}
+.sidebar-section { padding: var(--space-md); }
+.sidebar-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+.calendar-title { font-weight: 600; }
+.calendar-nav { display: flex; gap: var(--space-xs); }
+.calendar-nav-button {
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-secondary);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+.calendar-weekday {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-xs) 0;
+}
+.calendar-day {
+  position: relative;
+  height: 32px;
+  padding: 0;
+  font-size: var(--font-size-sm);
+}
+.calendar-day-empty { visibility: hidden; }
+.calendar-day-today { font-weight: 700; color: var(--color-accent); }
+.calendar-day-selected,
+.calendar-day-selected:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.calendar-day-written::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+}
+.calendar-day-selected.calendar-day-written::after { background: var(--color-accent-text); }
+
+.diary-list-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border);
+}
+.diary-list { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.diary-list-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm);
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+.diary-list-item-active { background: var(--color-hover); }
+.diary-list-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.diary-list-item-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.diary-list-item-date { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.diary-list-empty { padding: var(--space-sm); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+/* 메인 */
+.main { flex: 1; min-width: 0; overflow-y: auto; }
+.main-inner { max-width: 760px; margin: 0 auto; padding: var(--space-xl) var(--space-lg); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xl);
+}
+.stats-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.stat-item { padding: var(--space-md); border-left: 1px solid var(--color-border); }
+.stat-item:first-child { border-left: none; }
+.stat-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.stat-value { font-size: var(--font-size-lg); font-weight: 700; min-height: 32px; }
+.stat-unit { font-size: var(--font-size-sm); font-weight: 400; color: var(--color-text-secondary); margin-left: 2px; }
+
+.editor-date { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs); }
+.editor-title {
+  display: block;
+  width: 100%;
+  padding: var(--space-xs) 0;
+  border: none;
+  background: var(--color-bg);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+}
+.editor-title::placeholder, .editor-body::placeholder { color: var(--color-text-secondary); opacity: 0.6; }
+.editor-body {
+  display: block;
+  width: 100%;
+  min-height: 280px;
+  margin-top: var(--space-md);
+  padding: var(--space-xs) 0;
+  border: none;
+  background: var(--color-bg);
+  resize: vertical;
+  line-height: 1.8;
+}
+
+.editor-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+.editor-label { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); margin-bottom: var(--space-sm); }
+.mood-tag-list { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+
+.mood-tag {
+  display: inline-block;
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+.mood-tag-yellow.mood-tag-selected, .mood-tag-yellow.mood-tag-static { background: var(--color-tag-yellow); }
+.mood-tag-green.mood-tag-selected,  .mood-tag-green.mood-tag-static  { background: var(--color-tag-green); }
+.mood-tag-blue.mood-tag-selected,   .mood-tag-blue.mood-tag-static   { background: var(--color-tag-blue); }
+.mood-tag-red.mood-tag-selected,    .mood-tag-red.mood-tag-static    { background: var(--color-tag-red); }
+.mood-tag-purple.mood-tag-selected, .mood-tag-purple.mood-tag-static { background: var(--color-tag-purple); }
+.mood-tag-gray.mood-tag-selected,   .mood-tag-gray.mood-tag-static   { background: var(--color-tag-gray); }
+.mood-tag-static { border-color: transparent; }
+.mood-tag-selected { border-color: var(--color-text-secondary); }
+.mood-tag-button:hover { background: var(--color-hover); }
+
+.editor-actions { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); }
+.button { padding: var(--space-xs) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.button-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-text); }
+.button-primary:hover { background: var(--color-accent); opacity: 0.9; }
+.button-danger { color: var(--color-text-secondary); }
+.save-status { margin-left: auto; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+@media (max-width: 760px) {
+  .app { flex-direction: column; height: auto; }
+  .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--color-border); }
+  .diary-list { max-height: 200px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat-item:nth-child(3) { border-left: none; }
+  .stat-item:nth-child(n+3) { border-top: 1px solid var(--color-border); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="calendar-header">
+        <span class="calendar-title" id="calendar-title"></span>
+        <div class="calendar-nav">
+          <button class="calendar-nav-button" id="prev-month" aria-label="이전 달">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2 4 7l5 5"/></svg>
+          </button>
+          <button class="calendar-nav-button" id="today-button" aria-label="오늘" title="오늘">●</button>
+          <button class="calendar-nav-button" id="next-month" aria-label="다음 달">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m5 2 5 5-5 5"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="calendar-grid" id="calendar-grid"></div>
+    </div>
+
+    <div class="sidebar-section diary-list-section">
+      <h2 class="sidebar-title">일기 목록</h2>
+      <ul class="diary-list" id="diary-list"></ul>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-inner">
+      <h2 class="stats-title" id="stats-title"></h2>
+      <section class="stats" id="stats">
+        <div class="stat-item"><div class="stat-label">작성한 일기</div><div class="stat-value" id="stat-count"></div></div>
+        <div class="stat-item"><div class="stat-label">작성률</div><div class="stat-value" id="stat-rate"></div></div>
+        <div class="stat-item"><div class="stat-label">연속 기록</div><div class="stat-value" id="stat-streak"></div></div>
+        <div class="stat-item"><div class="stat-label">가장 많은 기분</div><div class="stat-value" id="stat-mood"></div></div>
+      </section>
+
+      <section class="editor">
+        <div class="editor-date" id="editor-date"></div>
+        <input class="editor-title" id="editor-title" type="text" placeholder="제목 없음" maxlength="80" aria-label="제목">
+        <textarea class="editor-body" id="editor-body" placeholder="오늘 하루는 어땠나요?" aria-label="본문"></textarea>
+
+        <div class="editor-section">
+          <div class="editor-label">오늘의 기분</div>
+          <div class="mood-tag-list" id="mood-tag-list"></div>
+        </div>
+
+        <div class="editor-actions">
+          <button class="button button-primary" id="save-button">저장</button>
+          <button class="button button-danger" id="delete-button">삭제</button>
+          <span class="save-status" id="save-status"></span>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var STORAGE_KEY = "diary-entries";
+  var MOODS = [
+    { id: "happy", label: "행복", color: "yellow" },
+    { id: "calm", label: "평온", color: "green" },
+    { id: "excited", label: "설렘", color: "purple" },
+    { id: "soso", label: "보통", color: "gray" },
+    { id: "sad", label: "우울", color: "blue" },
+    { id: "angry", label: "화남", color: "red" }
+  ];
+  var WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+  function $(id) { return document.getElementById(id); }
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function persist() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); return true; }
+    catch (e) { return false; }
+  }
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function toKey(y, m, d) { return y + "-" + pad(m + 1) + "-" + pad(d); }
+  function monthPrefix(y, m) { return y + "-" + pad(m + 1) + "-"; }
+  function moodOf(id) { return MOODS.filter(function (m) { return m.id === id; })[0]; }
+
+  var entries = load();
+  var now = new Date();
+  var todayKey = toKey(now.getFullYear(), now.getMonth(), now.getDate());
+  var viewYear = now.getFullYear();
+  var viewMonth = now.getMonth();
+  var selectedKey = todayKey;
+  var selectedMood = "";
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function moodTag(mood, extra) {
+    return el("span", "mood-tag mood-tag-" + mood.color + " " + extra, mood.label);
+  }
+
+  function keysInMonth() {
+    var prefix = monthPrefix(viewYear, viewMonth);
+    return Object.keys(entries).filter(function (k) { return k.indexOf(prefix) === 0; }).sort();
+  }
+
+  /* 캘린더 */
+  function renderCalendar() {
+    $("calendar-title").textContent = viewYear + "년 " + (viewMonth + 1) + "월";
+    var grid = $("calendar-grid");
+    grid.textContent = "";
+    WEEKDAYS.forEach(function (w) { grid.appendChild(el("div", "calendar-weekday", w)); });
+
+    var first = new Date(viewYear, viewMonth, 1).getDay();
+    var days = new Date(viewYear, viewMonth + 1, 0).getDate();
+    for (var i = 0; i < first; i++) grid.appendChild(el("div", "calendar-day calendar-day-empty"));
+
+    for (var d = 1; d <= days; d++) {
+      var key = toKey(viewYear, viewMonth, d);
+      var cls = "calendar-day";
+      if (entries[key]) cls += " calendar-day-written";
+      if (key === todayKey) cls += " calendar-day-today";
+      if (key === selectedKey) cls += " calendar-day-selected";
+      var btn = el("button", cls, String(d));
+      btn.dataset.key = key;
+      btn.addEventListener("click", function () { selectDate(this.dataset.key); });
+      grid.appendChild(btn);
+    }
+  }
+
+  /* 일기 목록 */
+  function renderList() {
+    var list = $("diary-list");
+    list.textContent = "";
+    var keys = keysInMonth().reverse();
+    if (!keys.length) {
+      list.appendChild(el("li", "diary-list-empty", "이 달에는 아직 일기가 없어요."));
+      return;
+    }
+    keys.forEach(function (key) {
+      var entry = entries[key];
+      var li = el("li");
+      var btn = el("button", "diary-list-item" + (key === selectedKey ? " diary-list-item-active" : ""));
+      btn.dataset.key = key;
+
+      var top = el("div", "diary-list-item-top");
+      top.appendChild(el("span", "diary-list-item-title", entry.title || "제목 없음"));
+      var mood = moodOf(entry.mood);
+      if (mood) top.appendChild(moodTag(mood, "mood-tag-static"));
+      btn.appendChild(top);
+
+      var parts = key.split("-");
+      var date = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+      btn.appendChild(el("div", "diary-list-item-date", (+parts[1]) + "월 " + (+parts[2]) + "일 (" + WEEKDAYS[date.getDay()] + ")"));
+
+      btn.addEventListener("click", function () { selectDate(this.dataset.key); });
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  }
+
+  /* 통계 */
+  function calcStreak() {
+    var cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (!entries[toKey(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())]) {
+      cursor.setDate(cursor.getDate() - 1); // 오늘 아직 안 썼어도 어제까지의 기록은 유지
+    }
+    var streak = 0;
+    while (entries[toKey(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())]) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+
+  function setStat(id, value, unit) {
+    var node = $(id);
+    node.textContent = value;
+    if (unit) node.appendChild(el("span", "stat-unit", unit));
+  }
+
+  function renderStats() {
+    var keys = keysInMonth();
+    var total = new Date(viewYear, viewMonth + 1, 0).getDate();
+    $("stats-title").textContent = (viewMonth + 1) + "월 기록 통계";
+    setStat("stat-count", keys.length, "개");
+    setStat("stat-rate", Math.round(keys.length / total * 100), "%");
+    setStat("stat-streak", calcStreak(), "일");
+
+    var counts = {};
+    keys.forEach(function (k) {
+      var m = entries[k].mood;
+      if (m) counts[m] = (counts[m] || 0) + 1;
+    });
+    var top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0];
+    var node = $("stat-mood");
+    node.textContent = "";
+    if (top && moodOf(top)) {
+      node.appendChild(moodTag(moodOf(top), "mood-tag-static"));
+    } else {
+      node.textContent = "-";
+    }
+  }
+
+  /* 작성 화면 */
+  function renderMoodButtons() {
+    var wrap = $("mood-tag-list");
+    wrap.textContent = "";
+    MOODS.forEach(function (mood) {
+      var cls = "mood-tag-button" + (mood.id === selectedMood ? " mood-tag-selected" : "");
+      var btn = moodTag(mood, cls);
+      btn.className = "mood-tag mood-tag-" + mood.color + " " + cls;
+      btn.setAttribute("role", "button");
+      btn.setAttribute("tabindex", "0");
+      btn.setAttribute("aria-pressed", mood.id === selectedMood ? "true" : "false");
+      btn.style.cursor = "pointer";
+      function toggle() {
+        selectedMood = selectedMood === mood.id ? "" : mood.id;
+        renderMoodButtons();
+      }
+      btn.addEventListener("click", toggle);
+      btn.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderEditor() {
+    var parts = selectedKey.split("-");
+    var date = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    $("editor-date").textContent = parts[0] + "년 " + (+parts[1]) + "월 " + (+parts[2]) + "일 " + WEEKDAYS[date.getDay()] + "요일";
+    var entry = entries[selectedKey];
+    $("editor-title").value = entry ? entry.title : "";
+    $("editor-body").value = entry ? entry.body : "";
+    selectedMood = entry ? entry.mood : "";
+    $("delete-button").style.display = entry ? "" : "none";
+    $("save-status").textContent = "";
+    renderMoodButtons();
+  }
+
+  function renderAll() {
+    renderCalendar();
+    renderList();
+    renderStats();
+  }
+
+  function selectDate(key) {
+    selectedKey = key;
+    var parts = key.split("-");
+    viewYear = +parts[0];
+    viewMonth = +parts[1] - 1;
+    renderEditor();
+    renderAll();
+  }
+
+  function flash(message) {
+    var node = $("save-status");
+    node.textContent = message;
+    setTimeout(function () { if (node.textContent === message) node.textContent = ""; }, 2000);
+  }
+
+  function save() {
+    var title = $("editor-title").value.trim();
+    var body = $("editor-body").value.trim();
+    if (!title && !body && !selectedMood) { flash("내용을 입력해주세요."); return; }
+    entries[selectedKey] = { title: title, body: body, mood: selectedMood };
+    if (!persist()) { flash("저장에 실패했어요."); return; }
+    $("delete-button").style.display = "";
+    renderAll();
+    flash("저장했어요.");
+  }
+
+  function remove() {
+    if (!entries[selectedKey]) return;
+    if (!confirm("이 날의 일기를 삭제할까요?")) return;
+    delete entries[selectedKey];
+    persist();
+    renderEditor();
+    renderAll();
+  }
+
+  function moveMonth(delta) {
+    var d = new Date(viewYear, viewMonth + delta, 1);
+    viewYear = d.getFullYear();
+    viewMonth = d.getMonth();
+    renderAll();
+  }
+
+  $("prev-month").addEventListener("click", function () { moveMonth(-1); });
+  $("next-month").addEventListener("click", function () { moveMonth(1); });
+  $("today-button").addEventListener("click", function () { selectDate(todayKey); });
+  $("save-button").addEventListener("click", save);
+  $("delete-button").addEventListener("click", remove);
+
+  renderEditor();
+  renderAll();
+})();
+</script>
+</body>
+</html>
